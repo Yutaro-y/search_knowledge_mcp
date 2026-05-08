@@ -15,7 +15,7 @@ _META_CHARSET_PATTERN = re.compile(
 DEFAULT_HEADERS = {
     "User-Agent": (
         "search-knowledge-mcp/0.1.0 "
-        "(+https://github.com/yourname/search-knowledge-mcp)"
+        "(+https://github.com/Yutaro-y/search_knowledge_mcp.git)"
     ),
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
