@@ -1,0 +1,555 @@
+インターネット検索MCPサーバ_仕様書案#1
+<出力1>
+### 目的とゴール
+
+このMCPサーバは、**ネットワーク機器・OS・ミドルウェア・CVE・リリースノートなどの最新技術情報をインターネットから収集し、LLMエージェントが高精度に参照できる検索専用サーバ**として設計します。
+
+主なユースケースは次の通りです。
+
+- **NW機器（Cisco, YAMAHA, Fortinet, etc.）のコマンド構文・設定例・仕様の取得**
+- **OS/バージョン固有の仕様を踏まえたコンフィグ検討**
+- **CVE・バグ情報・リリースノート・仕様変更を踏まえた設計・設定検討**
+- その他最新の情報を取得したいとき。時世も含めて現在利用しているLLMの既存学習内容に完全一致する内容が無い場合など。
+
+クライアントは **LangGraph + LangChain `MultiServerMCPClient` を利用する自作チャットアプリ**を想定します。
+
+---
+
+## 1. 全体アーキテクチャ仕様
+
+### 1.1 トランスポートとMCP仕様バージョン
+
+- **MCP仕様:** 2025-03-26 版を前提とした設計(できるだけ最新かつ、維持管理含めて安定した開発及び実装)。FastMCP使用でOK
+- **トランスポート:**
+  - **優先:** `stdio` MCPサーバ（シンプルでLangChainクライアントと相性が良い）
+  - **将来拡張:** `Streamable HTTP` 対応を別ブランチ/別エントリポイントで追加可能な構成にする
+- **メッセージ形式:** JSON-RPC 2.0
+
+---
+
+## 2. プロジェクト構成仕様
+
+### 2.1 ディレクトリ構成（Python + uv 前提）
+
+```text
+mcp-netsearch-server/
+├─ pyproject.toml
+├─ uv.lock
+├─ .env.example
+├─ .env                # 本番は.gitignore
+├─ src/
+│  ├─ mcp_netsearch/
+│  │  ├─ __init__.py
+│  │  ├─ server.py          # MCPサーバ本体（エントリポイント）
+│  │  ├─ config.py          # 設定・環境変数読み込み
+│  │  ├─ search_client.py   # OpenAI / 他検索APIクライアント
+│  │  ├─ parsers/
+│  │  │  ├─ cisco.py        # ベンダー/カテゴリ別パーサ（任意）
+│  │  │  ├─ yamaha.py
+│  │  │  └─ generic.py
+│  │  ├─ schemas.py         # ツール入出力JSON Schema
+│  │  └─ logging_utils.py
+└─ scripts/
+   └─ run_stdio_server.py   # `python -m` でも可
+```
+
+### 2.2 「uvx create-mcp-server」を使うかどうか
+
+**推奨方針:**
+
+- **最初に一度 `uvx create-mcp-server` でテンプレートを生成し、そこから上記構成に寄せてカスタマイズ**するのがベスト。
+  - 理由:
+    - MCPサーバの**基本的なエントリポイント・ハンドラ・JSON-RPC配線**が自動で揃う
+    - `pyproject.toml` や `uv` 前提の構成が最初から整う
+- すでに独自構成を強く決めたい場合は、テンプレートを別ディレクトリに作成し、**必要な部分だけ移植**する運用も可。FastMCPでもよい。
+
+---
+
+## 3. 実装環境・依存関係仕様
+
+### 3.1 実行環境
+
+- **OS:** Windows 10 / 11, Linux (Ubuntu 24.x 以降)
+- **Python:** 3.11 以上推奨
+- **パッケージ管理:** `uv`（`uvx` でCLI実行）
+
+### 3.2 環境変数・機微情報
+
+- `.env` に格納し、`load-dotenv` などで読み込む
+- 必須環境変数（例）:
+  - **`OPENAI_API_KEY`**
+  - 必要に応じて:
+    - `OPENAI_BASE_URL`（プロキシやAzure OpenAI利用時）
+    - `SEARCH_PROVIDER`（`openai`, `brave`, `serpapi` など将来拡張用）
+    - `HTTP_PROXY` / `HTTPS_PROXY`（企業ネットワーク向け）
+
+`.env.example` にはキー名のみ記載し、値は空にして共有。
+
+---
+
+## 4. 機能仕様（MCPサーバとしてのプリミティブ）
+
+このサーバは **「ツール（Tools）」を中心とした設計**とし、Prompts/Resourcesは最小限または将来拡張とします。
+FastMCPでOK。
+将来的にMCP-UIにも対応できる機能実装だけはしておきたい。(クライアントのMCP-UI対応はまだロードマップ段階)
+
+### 4.1 提供する主なツール一覧
+
+#### 4.1.1 `search_network_docs`
+
+**目的:**  
+NW機器（Cisco, YAMAHA, Fortinet, Juniper 等）の**コマンドリファレンス・設定例・公式ドキュメント**を検索し、構造化して返す。
+
+**入力スキーマ（JSON Schema）:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "vendor": {
+      "type": "string",
+      "description": "ベンダ名。例: cisco, yamaha, fortinet, juniper など"
+    },
+    "product_family": {
+      "type": "string",
+      "description": "製品ファミリやOS名。例: ios, ios-xe, asa, fortios, rtシリーズ など"
+    },
+    "version": {
+      "type": "string",
+      "description": "OS/ファームウェアバージョン。例: 17.9, 15.2(4)M7, 7.4.3 など",
+      "nullable": true
+    },
+    "query": {
+      "type": "string",
+      "description": "調べたい内容。例: 'BGPの設定例', 'NATのコマンドリファレンス', 'IPSec VPN 設定手順'"
+    },
+    "max_results": {
+      "type": "integer",
+      "description": "取得する候補数の上限",
+      "default": 5,
+      "minimum": 1,
+      "maximum": 20
+    }
+  },
+  "required": ["vendor", "query"],
+  "additionalProperties": false
+}
+```
+
+**出力フォーマット（ツール戻り値のJSON構造）:**
+
+```json
+{
+  "results": [
+    {
+      "title": "string",
+      "summary": "string",
+      "url": "string",
+      "source_type": "string",
+      "vendor": "string",
+      "product_family": "string",
+      "version": "string",
+      "snippets": ["string"],
+      "last_updated": "string"
+    }
+  ],
+  "meta": {
+    "query_executed": "string",
+    "provider": "string",
+    "timestamp": "string"
+  }
+}
+```
+
+- **`source_type` 例:** `"official_doc"`, `"community_forum"`, `"blog"`, `"kb_article"`
+- **`last_updated`** は可能ならページ内の日付を抽出、なければ `null` または空文字。
+
+---
+
+#### 4.1.2 `search_os_and_software_specs`
+
+**目的:**  
+OS/ライブラリ/パッケージ/SDK/メーカー製品などの**仕様・制約・設定例**を検索する。
+
+**入力スキーマ:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "target_name": {
+      "type": "string",
+      "description": "対象名。例: 'Ubuntu 24.04', 'RHEL 9', 'Python 3.11', 'FortiOS 7.4'"
+    },
+    "category": {
+      "type": "string",
+      "description": "情報カテゴリ。例: 'install', 'config', 'limits', 'performance', 'cli-reference'",
+      "nullable": true
+    },
+    "query": {
+      "type": "string",
+      "description": "調べたい内容。例: 'netplanでVLAN設定', 'systemdの制限値', '最大セッション数'"
+    },
+    "max_results": {
+      "type": "integer",
+      "default": 5,
+      "minimum": 1,
+      "maximum": 20
+    }
+  },
+  "required": ["target_name", "query"],
+  "additionalProperties": false
+}
+```
+
+**出力フォーマット:** `search_network_docs` と同じ構造を再利用（`target_name` を `meta` に含める）。
+
+---
+
+#### 4.1.3 `search_vulnerabilities_and_bugs`
+
+**目的:**  
+CVE・バグ情報・セキュリティアドバイザリ・既知の不具合とその回避策/修正情報を検索する。
+
+**入力スキーマ:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "product": {
+      "type": "string",
+      "description": "製品名やOS名。例: 'Cisco IOS XE', 'FortiOS', 'Ubuntu 24.04'"
+    },
+    "version": {
+      "type": "string",
+      "description": "バージョン。例: '17.9.3', '7.4.3', '24.04.1'",
+      "nullable": true
+    },
+    "cve_id": {
+      "type": "string",
+      "description": "特定のCVE ID。例: 'CVE-2024-12345'",
+      "nullable": true
+    },
+    "query": {
+      "type": "string",
+      "description": "調べたい内容。例: '既知の脆弱性', '重大なバグ', 'VPN関連の不具合'",
+      "nullable": true
+    },
+    "max_results": {
+      "type": "integer",
+      "default": 10,
+      "minimum": 1,
+      "maximum": 50
+    }
+  },
+  "required": ["product"],
+  "additionalProperties": false
+}
+```
+
+**出力フォーマット:**
+
+```json
+{
+  "results": [
+    {
+      "title": "string",
+      "cve_id": "string",
+      "severity": "string",
+      "cvss_score": "number",
+      "summary": "string",
+      "affected_products": ["string"],
+      "fixed_versions": ["string"],
+      "workarounds": ["string"],
+      "url": "string",
+      "last_updated": "string",
+      "source_type": "string"
+    }
+  ],
+  "meta": {
+    "query_executed": "string",
+    "provider": "string",
+    "timestamp": "string"
+  }
+}
+```
+
+---
+
+#### 4.1.4 `search_release_notes_and_updates`
+
+**目的:**  
+ファームウェアやOSの**リリースノート・アップデート情報・仕様変更**を検索する。
+
+**入力スキーマ:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "product": {
+      "type": "string",
+      "description": "製品名。例: 'Cisco IOS XE', 'FortiOS', 'Yamaha RTX'"
+    },
+    "current_version": {
+      "type": "string",
+      "description": "現在利用中のバージョン",
+      "nullable": true
+    },
+    "target_version": {
+      "type": "string",
+      "description": "検討中のバージョン。例: '17.9.4', '7.4.4'",
+      "nullable": true
+    },
+    "query": {
+      "type": "string",
+      "description": "特に知りたい内容。例: '重大な仕様変更', '既知の制限事項', 'VPN関連の変更点'",
+      "nullable": true
+    },
+    "max_results": {
+      "type": "integer",
+      "default": 5,
+      "minimum": 1,
+      "maximum": 20
+    }
+  },
+  "required": ["product"],
+  "additionalProperties": false
+}
+```
+
+**出力フォーマット:**
+
+```json
+{
+  "results": [
+    {
+      "title": "string",
+      "version": "string",
+      "release_date": "string",
+      "url": "string",
+      "highlights": ["string"],
+      "breaking_changes": ["string"],
+      "security_fixes": ["string"],
+      "known_issues": ["string"],
+      "upgrade_notes": ["string"]
+    }
+  ],
+  "meta": {
+    "query_executed": "string",
+    "provider": "string",
+    "timestamp": "string"
+  }
+}
+```
+
+---
+
+#### 4.1.5 `search_freeform_tech_info`
+
+**目的:**  
+上記カテゴリに当てはまらないが、**技術情報全般を自由に検索**したい場合の汎用ツール。
+
+**入力スキーマ:**
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "自由形式の技術的な質問・検索クエリ"
+    },
+    "max_results": {
+      "type": "integer",
+      "default": 5,
+      "minimum": 1,
+      "maximum": 20
+    }
+  },
+  "required": ["query"],
+  "additionalProperties": false
+}
+```
+
+**出力フォーマット:** `search_network_docs` と同様。
+
+---
+
+## 5. 検索ロジック仕様
+
+### 5.1 検索バックエンド
+
+- **第一候補:** OpenAIの検索系エンドポイント（`gpt-5.x` + Web検索ツール or 専用Search API）を利用
+- 将来拡張として、**Brave Search / Perplexity / SerpAPI / 独自クローラ**などを差し替え可能な設計にする
+
+### 5.2 検索クエリ生成ポリシー
+
+- MCPツール入力をもとに、**LLMで検索クエリを整形**する層を `search_client.py` に実装
+  - 例:  
+    - vendor, product_family, version, query から  
+      `"Cisco IOS XE 17.9 BGP configuration example official documentation"` のようなクエリを生成
+- **ベンダ公式ドメインを優先**するため、クエリに `site:cisco.com` などを付与するオプションを持つ
+- **カテゴリ別のテンプレート**を用意:
+  - コマンドリファレンス → `"command reference"`, `"configuration guide"`
+  - CVE → `"CVE-XXXX-YYYY vendor product version"`
+  - リリースノート → `"release notes"`, `"new features"`, `"resolved caveats"`
+
+### 5.3 レスポンス整形ポリシー
+
+- 取得した検索結果から、**LLMで要約・抽出**を行い、仕様で定めたJSON構造にマッピング
+- 各エントリに必ず **`url` を含める**
+- 可能な限り:
+  - 日付（`release_date`, `last_updated`）
+  - バージョン
+  - 重大度（CVEの場合）
+  を抽出する
+
+### 5.4 エラー・タイムアウト・リトライ
+
+- **タイムアウト:** 1リクエストあたり 10〜20秒程度を上限
+- **リトライ:** 一時的なネットワークエラー時は 1〜2回リトライ
+- **エラー時の戻り値:**
+
+```json
+{
+  "results": [],
+  "meta": {
+    "query_executed": "string",
+    "provider": "string",
+    "timestamp": "string",
+    "error": {
+      "type": "string",
+      "message": "string"
+    }
+  }
+}
+```
+
+- MCPレベルでは、JSON-RPCエラーコードも適切に返す（`-32000` 以降のカスタムコードを利用）。
+
+---
+
+## 6. セキュリティ・コンプライアンス仕様
+
+- **外部HTTPアクセスのみ**を行い、ローカルファイルや内部ネットワークにはアクセスしない設計
+- **URLフィルタリング:**
+  - 明らかに不審なドメイン（マルウェア配布サイト等）を除外する簡易フィルタを実装可能な構造にする
+- **ログ:**
+  - 検索クエリ・レスポンスの要約・エラー情報をログ出力
+  - 機微情報（APIキー・ユーザ固有情報）はログに出さない
+- **レート制御:**
+  - 1クライアントあたりのリクエスト頻度を制限できるように、`search_client` に簡易レートリミットを実装可能な構造にする
+
+---
+
+## 7. MCPサーバ実装仕様（Python側）
+
+### 7.1 エントリポイント
+
+- `src/mcp_netsearch/server.py` に **MCPサーバ本体**を実装
+- `uvx` からの起動例:
+
+```bash
+uvx python -m mcp_netsearch.server
+```
+
+または
+
+```bash
+uvx python scripts/run_stdio_server.py
+```
+
+### 7.2 MCPサーバの責務
+
+- JSON-RPC 2.0 メッセージの受信・送信
+- MCPの `initialize` / `list_tools` / `call_tool` などの基本メソッドを実装
+- 上記で定義したツールを `list_tools` で公開
+- `call_tool` で:
+  1. ツール名を判別
+  2. 入力JSONを `schemas.py` のバリデーションで検証
+  3. `search_client` の対応メソッドを呼び出し
+  4. 結果をツール仕様のJSONに整形して返却
+- 上記はFastMCPで簡略化できる部分はFastMCP活用の方針で構わない。
+
+---
+
+## 8. LangGraph / LangChain クライアント側との連携仕様
+
+### 8.1 MultiServerMCPClient 前提
+
+- クライアント側では、`MultiServerMCPClient` にこのサーバを登録
+- 設定例（イメージ）:
+
+```python
+mcp_client = MultiServerMCPClient(
+    servers={
+        "netsearch": {
+            "command": "uvx",
+            "args": ["python", "-m", "mcp_netsearch.server"],
+            "transport": "stdio"
+        }
+    }
+)
+```
+
+### 8.2 エージェント側の利用パターン
+
+- LangGraphの `create_react_agent` で、**ツールとして `netsearch` MCPサーバのツール群を登録**
+- プロンプト側で、以下を明示:
+  - 「NW機器の設定・CVE・リリースノートなどの情報は、必ず `netsearch` MCPツールを使って確認すること」
+  - 「URLとバージョン・日付を重視して、古い情報を鵜呑みにしないこと」
+
+---
+
+## 9. 実装手順（コーディングエージェント向け）
+
+1. **テンプレート生成（任意だが推奨）**
+   - `uvx create-mcp-server mcp-netsearch-server`
+   - 生成された構成を確認し、`src/mcp_netsearch/` にリネーム・整理
+
+2. **依存パッケージの追加**
+   - OpenAIクライアント（`openai`）
+   - `.env` 読み込み（`python-dotenv`）
+   - JSON Schemaバリデーション（`pydantic` または `jsonschema`）
+
+3. **`config.py` 実装**
+   - `.env` から `OPENAI_API_KEY` 等を読み込み
+   - 検索プロバイダ設定を保持
+
+4. **`schemas.py` 実装**
+   - 本仕様で定義した各ツールの入力スキーマ・出力型を定義
+
+5. **`search_client.py` 実装**
+   - 各ツールに対応するメソッド:
+     - `search_network_docs(...)`
+     - `search_os_and_software_specs(...)`
+     - `search_vulnerabilities_and_bugs(...)`
+     - `search_release_notes_and_updates(...)`
+     - `search_freeform_tech_info(...)`
+   - OpenAI APIを呼び出し、検索クエリ生成 → Web検索 → 結果整形を実装
+
+6. **`server.py` 実装**
+   - MCPサーバの初期化・ツール登録・`call_tool` 実装
+   - `stdio` トランスポートで動作するようにする
+
+7. **動作確認**
+   - ローカルでサーバを起動し、簡易クライアント（またはLangChainのMCPクライアント）からツール呼び出しテスト
+   - 例: Cisco BGP設定例、FortiClientの特定エラー（今開いているFortinetコミュニティのようなケース）などで検証
+
+---
+
+## 10. 追加で決めておくと良い仕様
+
+- **ベンダ優先度ポリシー:**
+  - `vendor` が指定されている場合は、公式ドメインを最優先
+- **情報の鮮度ポリシー:**
+  - 可能なら「直近X年以内の情報を優先」などのルールをLLMプロンプトに含める
+- **言語ポリシー:**
+  - 日本語/英語両方の情報を対象にするが、**公式ドキュメントが英語のみの場合は英語を優先**
+- **レスポンスサイズ制御:**
+  - `snippets` や `summary` はLLMが扱いやすいように、1件あたり最大Nトークン程度に抑える
+
+---
+</出力1>
