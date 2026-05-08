@@ -57,7 +57,8 @@ class OpenAIWebSearchClient:
                 results=[],
                 notes_for_llm=(
                     "OPENAI_API_KEY が未設定です。"
-                    ".env または環境変数に設定してください。"
+                    "MCP クライアントがサーバ起動時に渡す環境変数へ設定してください。"
+                    "ローカル開発時のみ `.env` を補助的に利用できます。"
                 ),
                 error={
                     "type": "ConfigurationError",

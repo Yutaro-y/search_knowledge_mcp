@@ -35,3 +35,7 @@ build/
 # local documents
 インターネット検索*
 対応履歴.md
+
+# tmp
+.github/workflows/
+

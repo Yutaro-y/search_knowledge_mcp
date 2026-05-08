@@ -25,10 +25,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/yourname/search-knowledge-mcp"
-Repository = "https://github.com/yourname/search-knowledge-mcp"
-Issues = "https://github.com/yourname/search-knowledge-mcp/issues"
-Changelog = "https://github.com/yourname/search-knowledge-mcp/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/Yutaro-y/search_knowledge_mcp"
+Repository = "https://github.com/Yutaro-y/search_knowledge_mcp.git"
+Issues = "https://github.com/Yutaro-y/search-knowledge-mcp/issues"
+Changelog = "https://github.com/Yutaro-y/search-knowledge-mcp/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [
