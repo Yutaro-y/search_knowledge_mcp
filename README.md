@@ -23,12 +23,17 @@ OpenAI Responses API + Web Search を利用して、ネットワーク機器、O
 - OpenAI API Key
 
 ## セットアップ
+### ローカル開発時
 ```bash
 cd /home/user/projects/mcpServers/search_knowledge_mcp
 cp .env.example .env
 # .env に OPENAI_API_KEY を設定
 uv sync
 ```
+
+### パッケージ利用時の考え方
+PyPI / `uvx` 経由で利用する場合、`OPENAI_API_KEY` は **MCP クライアントがサーバ起動時に渡す環境変数** から与えることを前提とします。
+`.env` はローカル開発や単体動作確認の補助手段です。
 
 ## 起動
 目的: stdio で MCP サーバを起動する  
@@ -38,20 +43,52 @@ uv sync
 uv run python -m search_knowledge_mcp.server
 ```
 
+PyPI 公開後は、次のような単体起動も想定します。
+
+```bash
+OPENAI_API_KEY="your-api-key" uvx search-knowledge-mcp
+```
+
 ## LangChain / LangGraph 連携例
+### ローカルソースコードを使う場合
 ```python
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
 client = MultiServerMCPClient(
     {
         "search-knowledge": {
-            "command": "uv",
-            "args": ["run", "python", "-m", "search_knowledge_mcp.server"],
-            "transport": "stdio",
+            "command": "/home/user/projects/mcpServers/search_knowledge_mcp/.venv/bin/python",
+            "args": ["/home/user/projects/mcpServers/search_knowledge_mcp/src/search_knowledge_mcp/server.py"],
+            "env": {
+                "OPENAI_API_KEY": "client's API Key" # your API Key
+                "OPENAI_MODEL": "model-name" # ex)"gpt-5.0"
+                },
+            "transport": "stdio"
         }
     }
 )
 ```
+
+### PyPI / uvx 経由で使う場合
+```python
+from langchain_mcp_adapters.client import MultiServerMCPClient
+
+client = MultiServerMCPClient(
+    {
+        "search-knowledge": {
+            "command": "uvx",
+            "args": ["search-knowledge-mcp"],
+            "transport": "stdio",
+            "env": {
+                "OPENAI_API_KEY": "client's API Key",
+                "OPENAI_MODEL": "gpt-4.1-mini",
+            },
+        }
+    }
+)
+```
+
+この MCP サーバは、クライアントごとに異なる API キーやモデル設定を利用できるよう、`OPENAI_API_KEY` と `OPENAI_MODEL` を起動時環境変数から読む設計です。共有サーバ側に固定キーを埋め込む前提ではありません。
 
 ## 環境変数
 `.env.example` を参照してください。
@@ -64,6 +101,15 @@ client = MultiServerMCPClient(
 - `DEFAULT_MAX_RESULTS`
 - `DEFAULT_FRESHNESS_DAYS`
 
+優先方針:
+- 配布利用: **MCP クライアントが `env` で渡す環境変数を利用**
+- ローカル開発: 必要に応じて `.env` を利用
+
+補足:
+- `OPENAI_API_KEY` はクライアントごとに異なる値を渡せます
+- `OPENAI_MODEL` もクライアント側 `env` から上書きできます
+- `OPENAI_API_KEY`が超重要です。ほかは"env"に設定しなくてよいです。モデルのアップデートを加味して`OPENAI_MODEL` も上書きできるようにしています。
+- `.env` はローカルで `uv run ...` する際の補助であり、配布利用の必須要件ではありません
 ## 戻り値で重視している情報
 各 `results[]` には、クライアントAIがソースの性質を判断しやすいよう、以下を含めます。
 
@@ -90,6 +136,9 @@ client = MultiServerMCPClient(
 - URL の生存確認を HTTP レベルで厳密検証する構成ではなく、まずは OpenAI Web Search の取得結果と構造化を優先しています。
 - 今後、HEAD/GET による URL 再検証レイヤを追加する余地があります。
 - Web 検索結果の実際の構造は OpenAI API 側の更新で変化しうるため、`parser.py` は壊れにくさを重視した実装にしています。
+- `OPENAI_API_KEY` はクライアントごとに異なる値を渡せるよう、MCP クライアント設定の `env` から注入する運用を推奨します。
+- `OPENAI_MODEL` もクライアント要件に応じて `env` から上書き可能です。
+- API キーを README やコード例へ直書きしたまま共有しないでください。
 
 ## テスト
 目的: 検索クエリ生成の基本動作を確認する  
