@@ -32,7 +32,26 @@ def search_network_knowledge(
     freshness_days: int = 365,
     include_page_content: bool = True,
 ) -> dict:
-    """NW機器、OS、CVE、リリースノートなどを横断検索する統合ツール。"""
+    """
+    NW機器、OS、CVE、リリースノートなどを横断検索する統合ツール。
+    query(str): 検索ワード。リクエスト時に必ず含める必要がある。 
+    device_vendor(str): ベンダー/メーカー名。※デフォルト: None
+    device_model(str):  モデル/型番名。※デフォルト: None
+    os_version(str):  "device_model"のOSバージョン。※デフォルト: None
+    categories(list[str]): 以下から選択するか、Noneを指定（全カテゴリ対象）。※デフォルト: None
+        - `command_reference`
+        - `config_example`
+        - `spec_detail`
+        - `cve`
+        - `bug`
+        - `workaround`
+        - `release_note`
+        - `update_info`
+    max_results(int): Web Search で収集するアクセス先の件数。 ※デフォルト: 8
+    language(str)  "auto", # 検索言語。多様な言語で広く情報を収集するポリシー
+    freshness_days(int) 情報の"鮮度"。int型で日数を指定。設定した値の日数分までの期間で検索する。古い機器やOS、ファームウェアに関する内容のような「古くならざるを得ない」項目については十分に大きな値を設定する ※デフォルト: 365
+    include_page_content: bool = True,
+    """
 
     payload = SearchNetworkKnowledgeInput(
         query=query,
