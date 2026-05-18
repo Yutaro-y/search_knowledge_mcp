@@ -33,25 +33,59 @@ def search_network_knowledge(
     include_page_content: bool = True,
 ) -> dict:
     """
-    NW機器、OS、CVE、リリースノートなどを横断検索する統合ツール。
-    query(str): 検索ワード。リクエスト時に必ず含める必要がある。 
-    device_vendor(str): ベンダー/メーカー名。※デフォルト: None
-    device_model(str):  モデル/型番名。※デフォルト: None
-    os_version(str):  "device_model"のOSバージョン。※デフォルト: None
-    categories(list[str]): 以下から選択するか、Noneを指定（全カテゴリ対象）。※デフォルト: None
-        - `command_reference`
-        - `config_example`
-        - `spec_detail`
-        - `cve`
-        - `bug`
-        - `workaround`
-        - `release_note`
-        - `update_info`
-    max_results(int): Web Search で収集するアクセス先の件数。 ※デフォルト: 8
-    language(str)  "auto", # 検索言語。多様な言語で広く情報を収集するポリシー
-    freshness_days(int) 情報の"鮮度"。int型で日数を指定。設定した値の日数分までの期間で検索する。古い機器やOS、ファームウェアに関する内容のような「古くならざるを得ない」項目については十分に大きな値を設定する ※デフォルト: 365
-    include_page_content: bool = True,
+    An integrated cross-domain search tool for network devices, operating systems, CVEs, release notes, and related technical information.
+
+    Parameters:
+        query (str):
+            The search keyword. This parameter is mandatory for every request.
+
+        device_vendor (str | None):
+            The vendor/manufacturer name of the device.
+            Default: None
+
+        device_model (str | None):
+            The model or product name/number of the device.
+            Default: None
+
+        os_version (str | None):
+            The OS version corresponding to the specified "device_model".
+            Default: None
+
+        categories (list[str] | None):
+            A list of categories to filter the search.  
+            If None, all categories are included.  
+            Default: None  
+            Available categories:
+                - `command_reference`
+                - `config_example`
+                - `spec_detail`
+                - `cve`
+                - `bug`
+                - `workaround`
+                - `release_note`
+                - `update_info`
+
+        max_results (int):
+            The number of target URLs to collect using "OpenAI_API + Web Search".
+            Default: 8
+
+        language (str):
+            The language used for searching.  
+            The policy is to gather information broadly across multiple languages.  
+            Default: "auto"
+
+        freshness_days (int):
+            The "freshness" threshold of the information, specified in days.  
+            Only content published within the specified number of days will be included.  
+            For topics that inherently involve older information—such as legacy devices, OS versions, or firmware—set this value sufficiently high.  
+            Default: 365
+
+        include_page_content (bool):
+            Whether to fetch and structurally extract the body content of each result URL.  
+            This should generally remain enabled.  
+            Default: True
     """
+
 
     payload = SearchNetworkKnowledgeInput(
         query=query,
@@ -71,12 +105,40 @@ def search_network_knowledge(
 def search_network_docs(
     vendor: str,
     query: str,
-    product_family: str | None = None,
+    product_family: str | None = None, # 製品ファミリーやシリーズ名を示す。例: Catalyst, Aironet, ASA, NVRなど
     version: str | None = None,
     max_results: int = 5,
     include_page_content: bool = True,
 ) -> dict:
-    """NW機器のコマンドリファレンス・設定例・公式ドキュメントを検索するラッパ。"""
+    """
+    NW機器のコマンドリファレンス・設定例・公式ドキュメントを検索するラッパ。
+    Seaching Reference, Configuration Examples, Official Documentation, and other Documentation/informaition for Network Devices.
+    Parameters:
+        vendor (str):
+            The vendor/manufacturer name of the device.  
+            Example: Cisco, YAMAHA, Fortinet
+
+        query (str):
+            The search keyword. This parameter is mandatory for every request.
+            
+        product_family (str | None):
+            The product family or series name of the device.  
+            Example: Catalyst, Aironet, ASA, NVR, Yamaha_RTX, etc. "None" for default.
+            Default: None
+        
+        version (str | None):
+            The version(mainly for OS versions) corresponding to the specified "product_family".
+            Default: None
+        
+        max_results (int):
+            The number of target URLs to collect using "OpenAI_API + Web Search".
+            Default: 8
+            
+        include_page_content (bool):
+            Whether to fetch and structurally extract the body content of each result URL.  
+            This should generally remain enabled.  
+            Default: True
+    """
 
     payload = SearchNetworkDocsInput(
         vendor=vendor,
@@ -108,7 +170,36 @@ def search_os_and_software_specs(
     max_results: int = 5,
     include_page_content: bool = True,
 ) -> dict:
-    """OS、ライブラリ、SDKなどの仕様・制約・設定例を検索するラッパ。"""
+    """
+    OS、ライブラリ、SDKなどの仕様・制約・設定例を検索するラッパ。
+    Searching technical specifications. Using for OS, libraries, SDKs, and other software. This can include details such as supported features, configuration examples, limitations, and best practices.
+    
+    Parameters:
+        target_name (str):
+            The name of the target OS, library, or SDK for which to search specifications.
+        query (str):
+            The search keyword. This parameter is mandatory for every request.
+        categories (list[str] | None):
+            A list of categories to filter the search.  
+            If None, all categories are included.  
+            Default: None  
+            Available categories:
+                - `command_reference`
+                - `config_example`
+                - `spec_detail`
+                - `cve`
+                - `bug`
+                - `workaround`
+                - `release_note`
+                - `update_info`
+        max_results (int):
+            The number of target URLs to collect using "OpenAI_API + Web Search".
+            Default: 5
+        include_page_content (bool):
+            Whether to fetch and structurally extract the body content of each result URL.  
+            This should generally remain enabled.  
+            Default: True
+    """
 
     payload = SearchOsAndSoftwareSpecsInput(
         target_name=target_name,
@@ -143,7 +234,28 @@ def search_vulnerabilities_and_bugs(
     max_results: int = 10,
     include_page_content: bool = True,
 ) -> dict:
-    """CVE、既知バグ、回避策、修正版情報を検索するラッパ。"""
+    """
+    CVE、既知バグ、回避策、修正版情報を検索するラッパ。
+    Searching CVEs, known bugs, workarounds, and patch information. This can include vulnerability details, affected versions, mitigation strategies, and links to official advisories or community discussions.
+    parameters:
+        product (str):
+            The product name for which to search vulnerabilities or bugs.
+            example: "Cisco IOS-XE", "FortiGate", "Yamaha RTX830", "Ubuntu 24.04LTS", "Windows11 pro", "Docker", "Apache", "pyMuPDF", etc.
+        version (str | None):
+            The version associated with the product. This can help narrow down the search to specific vulnerabilities or bugs that affect that version.
+            example: "17.9.3", "7.4.4", "20H2", "3.0.0", etc.
+        cve_id (str | None):
+            A specific CVE ID to search for, such as "CVE-2024-12345". If provided, the search will focus on this particular vulnerability.
+        query (str | None):
+            free keywords to add to the search. This can include specific features, components, or other relevant terms to further refine the search results.
+        max_results (int):
+            The number of target URLs to collect using "OpenAI_API + Web Search".
+            Default: 10
+        include_page_content (bool):
+            Whether to fetch and structurally extract the body content of each result URL.  
+            This should generally remain enabled.  
+            Default: True
+    """
 
     payload = SearchVulnerabilitiesAndBugsInput(
         product=product,
@@ -181,7 +293,29 @@ def search_release_notes_and_updates(
     max_results: int = 5,
     include_page_content: bool = True,
 ) -> dict:
-    """リリースノート、アップデート、仕様変更情報を検索するラッパ。"""
+    """
+    リリースノート、アップデート、仕様変更情報を検索するラッパ。
+    Searching release notes, updates, and specification changes. This can include information about new features, bug fixes, deprecations, and other changes introduced in different versions of a product.
+    parameters:
+        product (str):
+            The product name for which to search release notes or updates.
+            example: "Cisco IOS-XE", "FortiGate", "Yamaha RTX830", "Ubuntu 24.04LTS", "Windows11 pro", "Docker", "Apache", "pyMuPDF", etc.
+        current_version (str | None):
+            The current version of the product that the user is using. This can help identify relevant updates or release notes that pertain to the user's existing setup.
+            example: "17.9.3", "7.4.4", "20H2", "3.0.0", etc.
+        target_version (str | None):
+            The specific version that the user is interested in upgrading to or learning about. This can help focus the search on release notes or updates that are relevant to the target version.
+            example: "17.10.1", "7.5.0", "21H1", "3.1.0", etc.
+        query (str | None):
+            free keywords to add to the search. This can include specific features, components, or other relevant terms to further refine the search results.
+        max_results (int):
+            The number of target URLs to collect using "OpenAI_API + Web Search".
+            Default: 5
+        include_page_content (bool):
+            Whether to fetch and structurally extract the body content of each result URL.  
+            This should generally remain enabled.  
+            Default: True
+    """
 
     payload = SearchReleaseNotesAndUpdatesInput(
         product=product,

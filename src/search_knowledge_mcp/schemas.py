@@ -120,9 +120,9 @@ class SearchResponse(BaseModel):
 
 class SearchNetworkKnowledgeInput(BaseModel):
     query: str = Field(description="自由形式の技術検索クエリ")
-    device_vendor: str | None = Field(default=None, description="Cisco, YAMAHA, Fortinet など")
-    device_model: str | None = Field(default=None, description="IOS-XE, RTX830, FortiGate など")
-    os_version: str | None = Field(default=None, description="17.9.3, 7.4.4, Ubuntu 24.04 など")
+    device_vendor: str | None = Field(default=None, description="Cisco, YAMAHA, Fortinet などメーカー名を示す")
+    device_model: str | None = Field(default=None, description="IOS-XE, RTX830, FortiGate などメーカー製品モデルを示す。型番やシリーズ名など。")
+    os_version: str | None = Field(default=None, description="17.9.3, 7.4.4, Ubuntu 24.04 などOSやファームウェアバージョンを示す")
     categories: list[Category] = Field(default_factory=list)
     max_results: int = Field(default=8, ge=1, le=20)
     language: Literal["ja", "en", "auto"] = "auto"
@@ -135,7 +135,7 @@ class SearchNetworkKnowledgeInput(BaseModel):
 
 class SearchNetworkDocsInput(BaseModel):
     vendor: str
-    product_family: str | None = None
+    product_family: str | None = None # 製品ファミリーやシリーズ名を示す。例: Catalyst, Aironet, ASA, NVRなど
     version: str | None = None
     query: str
     max_results: int = Field(default=5, ge=1, le=20)
