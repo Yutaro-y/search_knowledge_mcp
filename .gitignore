@@ -37,7 +37,7 @@ build/
 対応履歴.md
 
 # Docs
-./docs/qiita*
+./docs/qiita_article.md
 
 # tmp
 .github/workflows/
