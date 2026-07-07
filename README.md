@@ -1,3 +1,26 @@
+# 目次
+[search-knowledge-mcp](#search-knowledge-mcp)  
+[特徴](#特徴)  
+[提供ツール](##提供ツール)
+[動作要件](##動作要件)  
+[セットアップ](##セットアップ)  
+[ローカル開発時](##ローカル開発時)  
+[パッケージ利用時のtips](###パッケージ利用時の考え方)  
+[起動](##起動)  
+[LangChain / LangGraph 連携例](##LangChain/LangGraph連携例)  
+[ローカルソースコードを使う場合](###ローカルソースコードを使う場合)  
+[PyPI / uvx 経由で使う場合 ※今後対応](###PyPI/uvx経由で使う場合※今後対応)  
+[環境変数](##環境変数)  
+[戻り値で重視している情報](##戻り値で重視している情報)  
+[注意事項](##注意事項)  
+[テスト](##テスト)  
+[開発](##開発)  
+[GitHub 公開準備](##GitHub公開準備)  
+[PyPI 公開準備](##PyPI公開準備)  
+[ライセンス](##ライセンス)
+
+
+
 # search-knowledge-mcp
 
 OpenAI Responses API + Web Search を利用して、ネットワーク機器、OS、ライブラリ、CVE、既知バグ、リリースノートなどの**最新技術情報**を収集する MCP サーバです。
@@ -24,6 +47,7 @@ OpenAI Responses API + Web Search を利用して、ネットワーク機器、O
 
 ## セットアップ
 ### ローカル開発時
+**原則ローカルで展開して利用**
 ```bash
 cd /home/user/projects/mcpServers/search_knowledge_mcp
 cp .env.example .env
@@ -49,7 +73,7 @@ PyPI 公開後は、次のような単体起動も想定します。
 OPENAI_API_KEY="your-api-key" uvx search-knowledge-mcp
 ```
 
-## LangChain / LangGraph 連携例
+## LangChain/LangGraph連携例
 ### ローカルソースコードを使う場合
 ```python
 from langchain_mcp_adapters.client import MultiServerMCPClient
@@ -69,7 +93,7 @@ client = MultiServerMCPClient(
 )
 ```
 
-### PyPI / uvx 経由で使う場合
+### PyPI/uvx経由で使う場合※今後対応
 ```python
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
@@ -156,7 +180,7 @@ uv run pytest
 uv run ruff check .
 ```
 
-## GitHub 公開準備
+## GitHub公開準備
 最低限、以下を置いています。
 - `.gitignore`
 - `LICENSE`
@@ -169,7 +193,7 @@ uv run ruff check .
 - `pyproject.toml` の `project.urls`
 - README 内の公開先URL
 
-## PyPI 公開準備
+## PyPI公開準備
 目的: ビルド成果物を作成する  
 期待結果: `dist/` 配下に wheel / sdist が生成される
 
