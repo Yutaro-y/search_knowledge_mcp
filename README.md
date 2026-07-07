@@ -44,7 +44,8 @@ OpenAI Responses API + Web Search を利用して、ネットワーク機器、O
 - Python 3.11+
 - uv
 - OpenAI API Key
-
+  
+[Return to TOP](#search-knowledge-mcp)  
 ## セットアップ
 ### ローカル開発時
 **原則ローカルで展開して利用**
@@ -73,6 +74,7 @@ PyPI 公開後は、次のような単体起動も想定します。
 OPENAI_API_KEY="your-api-key" uvx search-knowledge-mcp
 ```
 
+[Return to TOP](#search-knowledge-mcp)  
 ## LangChain/LangGraph連携例
 ### ローカルソースコードを使う場合
 ```python
@@ -133,7 +135,8 @@ client = MultiServerMCPClient(
 - `OPENAI_API_KEY` はクライアントごとに異なる値を渡せます
 - `OPENAI_MODEL` もクライアント側 `env` から上書きできます
 - `OPENAI_API_KEY`が超重要です。ほかは"env"に設定しなくてよいです。モデルのアップデートを加味して`OPENAI_MODEL` も上書きできるようにしています。
-- `.env` はローカルで `uv run ...` する際の補助であり、配布利用の必須要件ではありません
+- `.env` はローカルで `uv run ...` する際の補助であり、配布利用の必須要件ではありません  
+[Return to TOP](#search-knowledge-mcp)    
 ## 戻り値で重視している情報
 各 `results[]` には、クライアントAIがソースの性質を判断しやすいよう、以下を含めます。
 
@@ -164,6 +167,8 @@ client = MultiServerMCPClient(
 - `OPENAI_MODEL` もクライアント要件に応じて `env` から上書き可能です。
 - API キーを README やコード例へ直書きしたまま共有しないでください。
 
+  
+[Return to TOP](#search-knowledge-mcp)  
 ## テスト
 目的: 検索クエリ生成の基本動作を確認する  
 期待結果: テスト成功
@@ -179,7 +184,8 @@ uv run pytest
 ```bash
 uv run ruff check .
 ```
-
+  
+[Return to TOP](#search-knowledge-mcp)  
 ## GitHub公開準備
 最低限、以下を置いています。
 - `.gitignore`
@@ -193,6 +199,7 @@ uv run ruff check .
 - `pyproject.toml` の `project.urls`
 - README 内の公開先URL
 
+[Return to TOP](#search-knowledge-mcp)  
 ## PyPI公開準備
 目的: ビルド成果物を作成する  
 期待結果: `dist/` 配下に wheel / sdist が生成される
@@ -211,4 +218,6 @@ uv run twine upload dist/*
 ※ 実際の公開時には PyPI API Token を利用してください。
 
 ## ライセンス
-MIT
+MIT  
+
+[Return to TOP](#search-knowledge-mcp)  
